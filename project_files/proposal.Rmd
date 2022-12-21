@@ -1,0 +1,48 @@
+---
+title: "project proposal"
+author: "Joe Gallagher"
+date: "2022-11-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gtfstools)
+library(sf)
+library(tidyverse)
+```
+
+### Final Project Proposal
+
+This semester in Building Spatial Datasets, I've had the opportunity to start exploring transportation data using R. In my final project, I will wield some of this recent knowledge to "experience data in unusual ways" (Loukissas 2019). I will be conducting an exploratory analysis of Maryland Transit Administration data on bus routes and scheduled trips.
+
+#### What are your goals for the project?
+
+My goals for this project are numerous, but they can be broken into two broad categories.
+
+-   Explore data and answer questions like a transit planner would.
+    -   Familiarize myself with a widely deployed transit data standard, the General Transit Specification Feed (GTFS).
+    -   Following Wong (2013), GTFS can be used as a data source to conduct fairly high level analyses of transit service. Conduct preliminary analysis for my dissertation project.
+-   I am broadly interested in the effect of the 2017 Baltimore LINK comprehensive bus network redesign. I have some critical/theoretical concerns, like how transit planning 'best practice' is felt by transit users. However, all that work starts by exploring the question, **how exactly has Baltimore's bus network changed since 2017?**
+    -   What changes were made to "fix" the system?
+
+    -   Were long routes shortened? By how much?
+
+    -   Did LINK really expand access to frequent transit?
+
+    -   Did services increase on the most frequently used routes?
+
+#### What data can you use to support your goal?
+
+I will be using MTA GTFS data published at at least three different dates: circa 2015, when LINK was first proposed, circa 2017 after LINK was rolled out, and circa 2020, following LINK and the COVID-19 pandemic.
+
+```{r}
+##read in gtfs data for each year
+mta_aug_15 = read_gtfs ("./data/gtfs_08_2015.zip")
+mta_dec_17 = read_gtfs("./data/gtfs_12_2017.zip")
+mta_feb_20 = read_gtfs("./data/gtfs_2_20.zip")
+```
+
+#### What is your approach to using data to support your goal?
+
+Before this class, I have only been exposed to GTFS through interfaces: Google Maps, Transit and other mobility as a service (MAAS) platforms use GTFS to represent transit networks and assist users with journey planning. They, like other interfaces, "recontextualize data" (Loukissas 2019, p. 125). These applications use GTFS to present a smooth and interconnected transit system. Anyone who has ridden a bus knows that the interconnected transit system and fluid journeys presented by MAAS do not correspond to reality. For Loukissas, interfaces posit "that what data say is self-evident, requiring no interpretation" (2019, p. 127). This project, then, is an invitation to interpret data. To circumvent the interface and, rather than harness the data to (mis)represent transit networks, to see what GTFS data can teach us about changes to Baltimore's bus network.

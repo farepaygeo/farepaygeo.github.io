@@ -1,0 +1,132 @@
+---
+title: "Final Project Presentation"
+author: "Joe Gallagher"
+format: revealjs
+editor: visual
+---
+
+## Exploring Baltimore LINK using GTFS data in R
+
+#### Initial, ordering questions
+
+-   What can we learn from GTFS?\
+-   Specifically what can GTFS tell us about changes to Baltimore's bus network?
+
+## BaltimoreLINK
+
+In 2017, MDOT MTA rolled-out its redesigned bus network for Baltimore, called LINK.
+
+> BaltimoreLink is a complete overhaul and rebranding of the core transit system operating within the city and throughout the greater Baltimore region. The bus network prior to BaltimoreLink had many routes that were antiquated, served outdated job locations and were too long to manage reliably, especially those that traversed downtown Baltimore and compounded congestion. -MDOT MTA, ["BaltimoreLINK Basics"](https://www.mta.maryland.gov/baltimorelink-basics)
+
+## Why/what "change"?
+
+MDOT [materials](https://www.baltometro.org/sites/default/files/bmc_documents/committee/presentations/tc/TC171003pres_BaltimoreLink-Redesign.pdf) contemporary with LINK's roll-out proclaim "In order to fix the system, we have to change the system." What were the changes they made to the system? Has the system been fixed through these changes?
+
+-   Longest routes were shortened
+
+-   **Frequencies increased on key routes**
+
+-   Congestion-relief downtown
+
+-   Improve performance on 20 most frequently used routes\
+
+## Why GTFS?
+
+> The General Transit Feed Specification (GTFS) is a data specification that allows public transit agencies to publish their transit data in a format that can be consumed by a wide variety of software applications. GTFS is split into a schedule component that contains schedule, fare, and geographic transit information and a real-time component that contains arrival predictions, vehicle positions and service advisories. - [GTFS: Making Public Transit Data Universally Accessible](http://gtfs.org)\
+
+## Why GTFS?
+
+GTFS is probably best known as the "feed" that is consumed by apps like Google Maps, Transit and Citymapper. It provides those applications with information about transit stops, the routes that serve them, when they are served and how much it costs to ride them. It is an open source data specification that supports a whole bunch of transit-related interfaces, basically.
+
+## Working with GTFS in R
+
+```{r}
+library(gtfstools)
+library(tidyverse)
+setwd("C:/Users/farep/Documents/GitHub/farepay/ges600_final")
+gtfs <- read_gtfs("data/gtfs_6_2018.zip")
+```
+
+For this project, I used gtfstools to clean and manipulate my data.
+
+## Working with GTFS in R
+
+> gtfstools offers a set of convenient tools for editing and analysing transit feeds in GTFS format. Feeds are read as a list of data.tables, allowing for easy and fast data manipulation. Many of this package's features are based on functions from other packages, especially {tidytransit} and {gtfs2gps}.\
+
+## Working with GTFS in R
+```{r}
+gtfs <- read_gtfs("data/gtfs_6_2018.zip")
+```
+
+There are a few packages, you can use to work with GTFS data, but gtfstools had some really clever features, including filter_by_sf (which, naturally, I never wound up using).
+
+
+## What is in GTFS anyway?
+
+```{r}
+summary(gtfs)
+```
+
+gtfstools reads a GTFS (essentially a .zip with a bunch of .txt files) in as its own type of datatable, a dt_gtfs. Within this datatable are 9 other datatables (there could be even more depending on what the agency publishes but they aren't mandatory).
+
+## Filtering GTFS
+
+Some agencies publish separate GTFS for each of their transit services (i.e. GTFS for subway, GTFS for bus, GTFS for commuter rail), but MDOT MTA houses all their services in the same GTFS. Since I am interested in changes to the bus network, I want to filter for bus routes. Buses in GTFS are assigned a route_type of 3.
+
+```{r}
+gtfs <-filter_by_route_type(gtfs, route_type = 3)
+head(gtfs$routes$route_type)
+```
+
+## Filtering GTFS
+
+But because MDOT MTA lumps all their services together, we still have a little more work to do on buses. In this GTFS, from 2018, route_ids 10482 to 1053 are assigned to commuter routes, some of which don't even serve Baltimore.
+
+```{r}
+route_ids <- as.character(c(10482:10532))
+gtfs_fil <- filter_by_route_id(gtfs, route_id = route_ids, keep = FALSE) 
+```
+
+## From trips to routes to patterns
+
+In GTFS, the smallest "unit" is trip_ID. Trips in GTFS can basically be thought of as a single bus going from origin to destination, inbound or outbound. Routes are like bundles of trips that the agency has assigned the same route_short_name. They *usually* follow the same pattern of stops and share the same origins and destinations, but not always. Routes also bundle inbound and outbound trips together.
+
+## From trips to routes to patterns
+
+GTFS allows for an intermediate unit, which gtfstools will generate for us, called a pattern. Patterns share the same direction (inbound or outbound), and stop sequence, but they aggregate trip_ids. Pattern_ids can encompass a single trip_id or many, depending on how "common" a trip is.
+
+```{r}
+patterns <- get_stop_times_patterns(gtfs_fil)
+##patterns get joined to trips based on trip_id
+trips_patt <- gtfs_fil$trips %>%
+  left_join(patterns, by="trip_id")
+summary(trips_patt)
+```
+
+## Calculating headways
+
+HH:MM:SS isn't the easiest for performing calculations, so gtfstools allows users to convert arrival and departure times to seconds after midnight.
+
+```{r}
+gtfs_fil <- convert_time_to_seconds(gtfs_fil)
+
+```
+
+That creates a column in the stop_times datatable, which also contains information about trips and stop sequences. We can join it to trips_patt by trip_id.
+
+```{r}
+trips_patt <- left_join(gtfs_fil$stop_times, trips_patt, by = "trip_id")
+```
+
+## Calculating headways
+
+Service gets weird on weekends so it's not good practice to analyze it alongside weekday service, so we'll lose it. 1 is the service_id for weekdays.
+
+```{r}
+weekday_trips <- filter(trips_patt, service_id == 1)
+##1 is the service_id for weekdays.
+```
+
+## Calculating headways
+
+A headways is the time between when buses arrive at the same stop. If trip_1 of Route A arrives at Stop X at 15:00 and trip_2 of Route A arrives at Stop X at 15:10, Route A has a headway of 10 minutes.
